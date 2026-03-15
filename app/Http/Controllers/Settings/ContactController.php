@@ -22,7 +22,7 @@ class ContactController extends Controller
         ]);
 
         if ($request->hasFile('photo')) {
-            $validated['photo'] = $this->fileUpload($request->file('photo'), 'contact');
+            $validated['photo'] = $this->fileUpload($request->file('photo'), 'social-and-contact-icon');
         }
 
         $maxOrder = Contact::max('order');
