@@ -34,7 +34,10 @@ class PhonePasswordResetController extends Controller
         $user = User::where('phone', $data['phone'])->first();
 
         if (!$user) {
-            return back()->with('status', 'If the phone exists, we sent an OTP.');
+            return back()->with('status', 'These credentials do not match our records.');
+        }
+        if ($user->hasRole('admin')) {
+            return back()->with('status', 'Admin password cannot be reset using this method.');
         }
 
         $otp = (string) random_int(100000, 999999);
@@ -97,6 +100,12 @@ class PhonePasswordResetController extends Controller
         $user = User::where('phone', $data['phone'])->first();
         if (!$user) {
             return back()->withErrors(['phone' => 'User not found.']);
+        }
+
+        if ($user->hasRole('admin')) {
+            return back()->withErrors([
+                'phone' => 'Admin password cannot be reset using this method.'
+            ]);
         }
 
         $user->password = Hash::make($data['password']);
