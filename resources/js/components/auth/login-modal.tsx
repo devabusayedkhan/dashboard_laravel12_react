@@ -1,10 +1,14 @@
 import type { InertiaFormProps } from '@inertiajs/react';
+import { Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
 import Modal from '@/components/helper/Model';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import ForgotModal from './forgot-pass-modal';
+import ResetPasswordModal from './reset-password';
 
 type LoginFormData = {
     phone: string;
@@ -26,6 +30,12 @@ export default function LoginModal({
     form,
     onSubmit,
 }: Props) {
+    const [showPassword, setShowPassword] = useState(false);
+    const [isForgotOpen, setIsForgotOpen] = useState(false);
+
+    const [resetOpen, setResetOpen] = useState(false);
+    const [resetPhone, setResetPhone] = useState('');
+    
     return (
         <Modal
             isOpen={isOpen}
@@ -72,21 +82,45 @@ export default function LoginModal({
                         <InputError message={form.errors.phone} />
                     </div>
 
+                    {/* Password */}
                     <div className="grid gap-2">
-                        <Label htmlFor="login_password">Password</Label>
-                        <Input
-                            id="login_password"
-                            type="password"
-                            required
-                            autoComplete="current-password"
-                            name="password"
-                            placeholder="Password"
-                            className="border-orange-500"
-                            value={form.data.password}
-                            onChange={(e) =>
-                                form.setData('password', e.target.value)
-                            }
-                        />
+                        <div className="flex items-center">
+                            <Label htmlFor="password">Password</Label>
+
+                            <span
+                                 onClick={() => setIsForgotOpen(true)}
+                                className="ml-auto text-sm cursor-pointer hover:underline"
+                                tabIndex={5}
+                            >
+                                Forgot password?
+                            </span>
+                        </div>
+
+                        <div className="relative">
+                            <Input
+                                id="login_password"
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                autoComplete="current-password"
+                                name="password"
+                                placeholder="Password"
+                                className="border-orange-500 pr-10"
+                                value={form.data.password}
+                                onChange={(e) =>
+                                    form.setData('password', e.target.value)
+                                }
+                            />
+
+                            {/* Toggle Button */}
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                            >
+                                {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-4" />)}
+                            </button>
+                        </div>
+
                         <InputError message={form.errors.password} />
                     </div>
 
@@ -111,6 +145,21 @@ export default function LoginModal({
                     </button>
                 </div>
             </form>
+
+            <ForgotModal
+                isOpen={isForgotOpen}
+                onClose={() => setIsForgotOpen(false)}
+                onOtpSent={(phone) => {
+                    setIsForgotOpen(false);
+                    setResetPhone(phone);
+                    setResetOpen(true);
+                }}
+            />
+            <ResetPasswordModal
+                isOpen={resetOpen}
+                onClose={() => setResetOpen(false)}
+                phone={resetPhone}
+            />
         </Modal>
     );
 }

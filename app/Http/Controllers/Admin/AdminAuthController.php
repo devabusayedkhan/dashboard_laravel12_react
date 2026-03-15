@@ -123,6 +123,10 @@ class AdminAuthController extends Controller
             return back()->withErrors(['delete' => 'Super admin cannot be deleted']);
         }
 
+        if ($user->profile_photo) {
+            $this->fileDelete($user->profile_photo);
+        }
+
         $user->delete();
 
         return back()->with('success', 'User deleted');

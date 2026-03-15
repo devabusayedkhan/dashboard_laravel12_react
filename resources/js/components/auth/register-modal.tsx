@@ -1,4 +1,6 @@
 import type { InertiaFormProps } from '@inertiajs/react';
+import { Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
 import Modal from '@/components/helper/Model';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,8 @@ export default function RegisterModal({
     form,
     onSubmit,
 }: Props) {
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     return (
         <Modal
             isOpen={isOpen}
@@ -53,9 +57,14 @@ export default function RegisterModal({
                             placeholder="Full name"
                             className="border-orange-500"
                             value={form.data.name}
-                            onChange={(e) => form.setData('name', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('name', e.target.value)
+                            }
                         />
-                        <InputError message={form.errors.name} className="mt-2" />
+                        <InputError
+                            message={form.errors.name}
+                            className="mt-2"
+                        />
                     </div>
 
                     <div className="grid gap-2">
@@ -76,7 +85,9 @@ export default function RegisterModal({
                                 placeholder="1XXXXXXXXX"
                                 className="border-orange-500 pl-14"
                                 value={form.data.phone}
-                                onChange={(e) => form.setData('phone', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('phone', e.target.value)
+                                }
                             />
 
                             <div className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
@@ -85,7 +96,8 @@ export default function RegisterModal({
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            Format: <span className="font-medium">+8801XXXXXXXXX</span>
+                            Format:{' '}
+                            <span className="font-medium">+8801XXXXXXXXX</span>
                         </p>
 
                         <InputError message={form.errors.phone} />
@@ -93,38 +105,76 @@ export default function RegisterModal({
 
                     <div className="grid gap-2">
                         <Label htmlFor="password">Password</Label>
-                        <Input
-                            id="password"
-                            type="password"
-                            required
-                            autoComplete="new-password"
-                            name="password"
-                            placeholder="Password"
-                            className="border-orange-500"
-                            value={form.data.password}
-                            onChange={(e) => form.setData('password', e.target.value)}
-                        />
-                        <InputError message={form.errors.password} />
+                        <div className="relative">
+                            <Input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                autoComplete="new-password"
+                                name="password"
+                                placeholder="Password"
+                                className="border-orange-500"
+                                value={form.data.password}
+                                onChange={(e) =>
+                                    form.setData('password', e.target.value)
+                                }
+                            />
+                            <InputError message={form.errors.password} />
+
+                            {/* Toggle Button */}
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                ) : (
+                                    <Eye className="h-4 w-4" />
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="password_confirmation">
                             Confirm password
                         </Label>
-                        <Input
-                            id="password_confirmation"
-                            type="password"
-                            required
-                            autoComplete="new-password"
-                            name="password_confirmation"
-                            placeholder="Confirm password"
-                            className="border-orange-500"
-                            value={form.data.password_confirmation}
-                            onChange={(e) =>
-                                form.setData('password_confirmation', e.target.value)
-                            }
-                        />
-                        <InputError message={form.errors.password_confirmation} />
+                        <div className="relative">
+                            <Input
+                                id="password_confirmation"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                required
+                                autoComplete="new-password"
+                                name="password_confirmation"
+                                placeholder="Confirm password"
+                                className="border-orange-500"
+                                value={form.data.password_confirmation}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'password_confirmation',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                            <InputError
+                                message={form.errors.password_confirmation}
+                            />
+                            {/* Toggle Button */}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowConfirmPassword(!showConfirmPassword)
+                                }
+                                className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                            >
+                                {showConfirmPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                ) : (
+                                    <Eye className="h-4 w-4" />
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <Button
