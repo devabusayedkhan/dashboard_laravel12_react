@@ -199,8 +199,8 @@ function SiteContacts({
                         <p className="truncate font-medium">{item.name}</p>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {item.url.length > 20
-                            ? item.url.slice(0, 20) + '...'
+                        {item.url.length > 23
+                            ? item.url.slice(0, 23) + '...'
                             : item.url}
                     </p>
                 </div>

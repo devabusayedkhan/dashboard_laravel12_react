@@ -291,7 +291,7 @@ request.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     request.form = requestForm
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
 export const reset = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -306,7 +306,7 @@ reset.definition = {
 
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
 reset.url = (options?: RouteQueryOptions) => {
@@ -315,7 +315,7 @@ reset.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
 reset.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -324,7 +324,7 @@ reset.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
 reset.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -334,7 +334,7 @@ reset.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
     /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
     const resetForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -344,7 +344,7 @@ reset.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
             /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
         resetForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -353,7 +353,7 @@ reset.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
         })
             /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::reset
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:59
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:62
  * @route '/reset-password'
  */
         resetForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -369,7 +369,7 @@ reset.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     reset.form = resetForm
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::update
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:67
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:70
  * @route '/reset-password'
  */
 export const update = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -384,7 +384,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::update
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:67
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:70
  * @route '/reset-password'
  */
 update.url = (options?: RouteQueryOptions) => {
@@ -393,7 +393,7 @@ update.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::update
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:67
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:70
  * @route '/reset-password'
  */
 update.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -403,7 +403,7 @@ update.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
     /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::update
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:67
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:70
  * @route '/reset-password'
  */
     const updateForm = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -413,7 +413,7 @@ update.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
             /**
 * @see \App\Http\Controllers\Auth\PhonePasswordResetController::update
- * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:67
+ * @see app/Http/Controllers/Auth/PhonePasswordResetController.php:70
  * @route '/reset-password'
  */
         updateForm.post = (options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

@@ -31,11 +31,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import type { SiteContactItem } from '@/types';
 import type { BreadcrumbItem } from '@/types/navigation';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -237,7 +237,7 @@ export default function SiteSettings({ siteSettings, contacts }: PageProps) {
                 <Head title="Site Settings" />
 
                 <div className="min-h-screen">
-                    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
+                    <div className="mx-auto space-y-6 p-4 md:p-6 lg:p-8">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div className="space-y-2">
                                 <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">

@@ -1,23 +1,27 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { usePermissions } from 'inertia-permissions';
-import { SquarePen, Trash } from 'lucide-react';
-import React, { useRef, useState } from 'react';
+import { Archive, RotateCcw, SquarePen, Trash2, Users } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
 import Swal from 'sweetalert2';
 import Modal from '@/components/helper/Model';
 import { normalizeBDPhone } from '@/components/helper/NormalizePhone';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
 
-/** -------------------- Types -------------------- */
 type Role = { id: number; name: string };
+type TabType = 'users' | 'trash';
+type StatusFilter = '' | 'active' | 'inactive';
 
 type UserRow = {
   id: number;
   name: string;
   phone: string;
-  email: string;
+  email: string | null;
+  is_active: boolean;
   created_at: string;
+  deleted_at: string | null;
   role: string | null;
 };
 
@@ -41,7 +45,18 @@ type PaginatedUsers = {
 type Props = {
   users: PaginatedUsers;
   roles: Role[];
-  filters?: { q?: string; role?: string };
+  stats: {
+    users_count: number;
+    trash_count: number;
+    active_count: number;
+    inactive_count: number;
+  };
+  filters?: {
+    q?: string;
+    role?: string;
+    status?: string;
+    tab?: TabType;
+  };
   auth: { permissions: string[] };
 };
 
@@ -52,6 +67,7 @@ type UserFormData = {
   password: string;
   password_confirmation: string;
   role: string;
+  is_active: '1' | '0';
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -67,25 +83,26 @@ const showFirstError = (errors: Record<string, string>) => {
   Swal.fire({ icon: 'error', title: 'Action failed', text: firstMsg });
 };
 
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ');
+}
+
 function RoleSelect({
   roles,
   value,
   onChange,
   error,
-  label = 'Role',
 }: {
   roles: Role[];
   value: string;
   onChange: (val: string) => void;
   error?: string;
-  label?: string;
 }) {
   return (
     <div>
-      <label className="text-sm font-semibold">{label}</label>
-
+      <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Role</label>
       <select
-        className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
+        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -96,48 +113,53 @@ function RoleSelect({
           </option>
         ))}
       </select>
-
       {error && <div className="mt-1 text-sm text-red-600">{error}</div>}
     </div>
   );
 }
 
-/**
- * Pagination now preserves current filters (q + role)
- */
-function Pagination({
-  links,
-  q,
-  role,
+function StatusSelect({
+  value,
+  onChange,
+  error,
 }: {
-  links: PaginationLink[];
-  q?: string;
-  role?: string;
+  value: '1' | '0';
+  onChange: (val: '1' | '0') => void;
+  error?: string;
 }) {
+  return (
+    <div>
+      <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Status</label>
+      <select
+        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+        value={value}
+        onChange={(e) => onChange(e.target.value as '1' | '0')}
+      >
+        <option value="1">Active</option>
+        <option value="0">Inactive</option>
+      </select>
+      {error && <div className="mt-1 text-sm text-red-600">{error}</div>}
+    </div>
+  );
+}
+
+function Pagination({ links }: { links: PaginationLink[] }) {
   if (!links?.length) return null;
 
   return (
-    <div className="mt-4 flex flex-wrap justify-end gap-1">
+    <div className="mt-5 flex flex-wrap justify-end gap-2">
       {links.map((link, idx) => (
         <button
           key={idx}
           disabled={!link.url}
-          onClick={() => {
-            if (!link.url) return;
-
-            router.get(
-              link.url,
-              { q: q?.trim() ? q.trim() : undefined, role: role?.trim() ? role.trim() : undefined },
-              { preserveScroll: true, preserveState: true },
-            );
-          }}
-          className={[
-            'rounded border px-3 py-1 text-sm',
+          onClick={() => link.url && router.visit(link.url, { preserveScroll: true, preserveState: true })}
+          className={cx(
+            'rounded-lg border px-3 py-1.5 text-sm transition',
             link.active
-              ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-              : 'bg-white dark:bg-slate-800',
-            !link.url ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-50 dark:hover:bg-slate-700',
-          ].join(' ')}
+              ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
+              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
+            !link.url && 'cursor-not-allowed opacity-50',
+          )}
           dangerouslySetInnerHTML={{ __html: link.label }}
         />
       ))}
@@ -145,53 +167,89 @@ function Pagination({
   );
 }
 
-/** -------------------- Page -------------------- */
-export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
+function StatCard({ title, value, tone = 'default' }: { title: string; value: number; tone?: 'default' | 'green' | 'red' | 'amber' }) {
+  const toneClass = {
+    default: 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
+    green: 'border-green-200 bg-green-50/70 dark:border-green-900/40 dark:bg-green-950/20',
+    red: 'border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20',
+    amber: 'border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20',
+  }[tone];
+
+  return (
+    <div className={cx('rounded-2xl border p-4', toneClass)}>
+      <div className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</div>
+      <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</div>
+    </div>
+  );
+}
+
+export default function AdminUsersPage({ users, roles, stats, auth, filters }: Props) {
   const { canAny } = usePermissions();
 
-  // ---------- Modal State ----------
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
-  // ---------- Search + Role Filter State ----------
+  const activeTab = (filters?.tab ?? 'users') as TabType;
   const [search, setSearch] = useState(filters?.q ?? '');
   const [roleFilter, setRoleFilter] = useState(filters?.role ?? '');
+  const [statusFilter, setStatusFilter] = useState((filters?.status ?? '') as StatusFilter);
   const debounceRef = useRef<number | null>(null);
 
-  const runSearch = (q: string, role: string) => {
-    router.get(
-      route(INDEX_ROUTE),
-      {
-        q: q?.trim() ? q.trim() : undefined,
-        role: role?.trim() ? role.trim() : undefined,
-      },
-      {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-        only: ['users', 'filters'],
-      },
-    );
+  const canShowActions = canAny([
+    'admin.user.update',
+    'admin.user.destroy',
+    'admin.user.restore',
+    'admin.user.forcedelete',
+  ]);
+
+  const buildParams = (overrides?: Partial<{ q: string; role: string; status: StatusFilter; tab: TabType }>) => ({
+    q: (overrides?.q ?? search)?.trim() || undefined,
+    role: (overrides?.role ?? roleFilter)?.trim() || undefined,
+    status: (overrides?.status ?? statusFilter) || undefined,
+    tab: overrides?.tab ?? activeTab,
+  });
+
+  const visitIndex = (overrides?: Partial<{ q: string; role: string; status: StatusFilter; tab: TabType }>) => {
+    router.get(route(INDEX_ROUTE), buildParams(overrides), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+      only: ['users', 'roles', 'stats', 'filters'],
+    });
   };
 
-  const onSearchChange = (val: string) => {
-    setSearch(val);
+  const onSearchChange = (value: string) => {
+    setSearch(value);
 
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+    }
 
     debounceRef.current = window.setTimeout(() => {
-      runSearch(val, roleFilter);
+      visitIndex({ q: value });
     }, 350);
   };
 
-  const onRoleFilterChange = (val: string) => {
-    setRoleFilter(val);
-    // role change should be immediate (no debounce)
-    runSearch(search, val);
+  const onRoleFilterChange = (value: string) => {
+    setRoleFilter(value);
+    visitIndex({ role: value });
   };
 
-  // ---------- Forms ----------
+  const onStatusFilterChange = (value: StatusFilter) => {
+    setStatusFilter(value);
+    visitIndex({ status: value });
+  };
+
+  const onTabChange = (tab: TabType) => {
+    const nextStatus = tab === 'trash' ? '' : statusFilter;
+    if (tab === 'trash') {
+      setStatusFilter('');
+    }
+
+    visitIndex({ tab, status: nextStatus });
+  };
+
   const createForm = useForm<UserFormData>({
     name: '',
     email: '',
@@ -199,6 +257,7 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
     password: '',
     password_confirmation: '',
     role: '',
+    is_active: '1',
   });
 
   const editForm = useForm<UserFormData>({
@@ -208,22 +267,25 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
     password: '',
     password_confirmation: '',
     role: '',
+    is_active: '1',
   });
 
   const openCreate = () => {
+    createForm.reset();
     createForm.clearErrors();
     setCreateOpen(true);
   };
 
-  const openEdit = (u: UserRow) => {
-    setSelectedUser(u);
+  const openEdit = (user: UserRow) => {
+    setSelectedUser(user);
     editForm.setData({
-      name: u.name,
-      email: u.email,
-      phone: u.phone,
+      name: user.name,
+      email: user.email ?? '',
+      phone: user.phone,
       password: '',
       password_confirmation: '',
-      role: u.role ?? '',
+      role: user.role ?? '',
+      is_active: user.is_active ? '1' : '0',
     });
     editForm.clearErrors();
     setEditOpen(true);
@@ -240,19 +302,11 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
     editForm.clearErrors();
   };
 
-  // ---------- Submit Handlers ----------
   const submitCreate = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!createForm.data.role) {
-      createForm.setError('role', 'Role is required');
-      Swal.fire({ icon: 'warning', title: 'Role is required' });
-      return;
-    }
-
     createForm.post(route('admin.user.store'), {
       preserveScroll: true,
-
       onStart: () => {
         Swal.fire({
           title: 'Creating user...',
@@ -260,21 +314,16 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
           didOpen: () => Swal.showLoading(),
         });
       },
-
       onSuccess: () => {
         Swal.fire({
-          position: 'center',
           icon: 'success',
           title: 'User created successfully',
           showConfirmButton: false,
           timer: 1200,
         });
-        setCreateOpen(false);
+        closeCreate();
         createForm.reset();
-
-        runSearch(search, roleFilter);
       },
-
       onError: (errors) => {
         Swal.close();
         showFirstError(errors);
@@ -286,15 +335,8 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
     e.preventDefault();
     if (!selectedUser) return;
 
-    if (!editForm.data.role) {
-      editForm.setError('role', 'Role is required');
-      Swal.fire({ icon: 'warning', title: 'Role is required' });
-      return;
-    }
-
     editForm.put(route('admin.user.update', { user: selectedUser.id }), {
       preserveScroll: true,
-
       onStart: () => {
         Swal.fire({
           title: 'Updating user...',
@@ -302,22 +344,15 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
           didOpen: () => Swal.showLoading(),
         });
       },
-
       onSuccess: () => {
         Swal.fire({
-          position: 'center',
           icon: 'success',
           title: 'User updated successfully',
           showConfirmButton: false,
           timer: 1200,
         });
-        setEditOpen(false);
-        setSelectedUser(null);
-        editForm.reset();
-
-        runSearch(search, roleFilter);
+        closeEdit();
       },
-
       onError: (errors) => {
         Swal.close();
         showFirstError(errors);
@@ -325,259 +360,385 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
     });
   };
 
-  const confirmDelete = async (u: UserRow) => {
-    const res = await Swal.fire({
+  const confirmTrash = async (user: UserRow) => {
+    const result = await Swal.fire({
       icon: 'warning',
-      title: 'Delete user?',
-      text: `This will permanently delete "${u.name}".`,
+      title: 'Move user to trash?',
+      text: `"${user.name}" will be moved to trash.`,
       showCancelButton: true,
-      confirmButtonText: 'Yes, delete',
+      confirmButtonText: 'Yes, move to trash',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#dc2626',
     });
 
-    if (!res.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
-    router.delete(route('admin.user.destroy', { user: u.id }), {
+    router.delete(route('admin.user.destroy', { user: user.id }), {
       preserveScroll: true,
-
       onStart: () => {
-        Swal.fire({
-          title: 'Deleting user...',
-          allowOutsideClick: false,
-          didOpen: () => Swal.showLoading(),
-        });
+        Swal.fire({ title: 'Moving to trash...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
       },
-
       onSuccess: () => {
-        Swal.fire({
-          position: 'center',
-          icon: 'success',
-          title: 'User deleted',
-          showConfirmButton: false,
-          timer: 1200,
-        });
-        runSearch(search, roleFilter);
+        Swal.fire({ icon: 'success', title: 'User moved to trash', showConfirmButton: false, timer: 1200 });
       },
-
       onError: (errors) => {
         Swal.close();
-        const msg =
-          errors && Object.keys(errors).length
-            ? (Object.values(errors)[0] as string)
-            : 'Delete failed (permission or server error).';
-
-        Swal.fire({ icon: 'error', title: 'Delete failed', text: msg });
+        showFirstError(errors);
       },
     });
   };
 
-  const canShowActions = canAny(['admin.user.update', 'admin.user.destroy']);
+  const confirmRestore = async (user: UserRow) => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: 'Restore user?',
+      text: `Do you want to restore "${user.name}"?`,
+      showCancelButton: true,
+      confirmButtonText: 'Yes, restore',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#16a34a',
+    });
+
+    if (!result.isConfirmed) return;
+
+    router.patch(route('admin.user.restore', { id: user.id }), {}, {
+      preserveScroll: true,
+      onStart: () => {
+        Swal.fire({ title: 'Restoring user...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      },
+      onSuccess: () => {
+        Swal.fire({ icon: 'success', title: 'User restored successfully', showConfirmButton: false, timer: 1200 });
+      },
+      onError: (errors) => {
+        Swal.close();
+        showFirstError(errors);
+      },
+    });
+  };
+
+  const confirmForceDelete = async (user: UserRow) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Delete permanently?',
+      text: `"${user.name}" will be permanently deleted and cannot be recovered.`,
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete permanently',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#b91c1c',
+    });
+
+    if (!result.isConfirmed) return;
+
+    router.delete(route('admin.user.forcedelete', { id: user.id }), {
+      preserveScroll: true,
+      onStart: () => {
+        Swal.fire({ title: 'Deleting permanently...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      },
+      onSuccess: () => {
+        Swal.fire({ icon: 'success', title: 'User permanently deleted', showConfirmButton: false, timer: 1200 });
+      },
+      onError: (errors) => {
+        Swal.close();
+        showFirstError(errors);
+      },
+    });
+  };
+
+  const statusSummary = useMemo(() => {
+    if (activeTab === 'trash') {
+      return `${stats.trash_count} trashed users`;
+    }
+
+    return `${stats.active_count} active / ${stats.inactive_count} inactive`;
+  }, [activeTab, stats.active_count, stats.inactive_count, stats.trash_count]);
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Users" />
 
-      <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Users</h1>
+      <div className="flex h-full flex-1 flex-col gap-5 rounded-2xl p-4 md:p-6">
+        <div className="overflow-hidden rounded-2xl skShadow p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Users</h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Manage users, roles, activation status, and trash from one place.
+              </p>
 
-          {/* Search input (unchanged) */}
-          <input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by name, phone or email..."
-            className="w-95 rounded-md border-2 px-3 py-2 border-orange-500 outline-0"
-          />
+              <div className="mt-4 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => onTabChange('users')}
+                  className={cx(
+                    'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                    activeTab === 'users'
+                      ? 'bg-orange-500 text-white shadow'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  <Users size={16} />
+                  Users
+                  <span className={cx(
+                    'rounded-full px-2 py-0.5 text-xs',
+                    activeTab === 'users' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                  )}>
+                    {stats.users_count}
+                  </span>
+                </button>
 
-          {/* Role Filter (new, but same style family; no layout/design overhaul) */}
-          <select
-            value={roleFilter}
-            onChange={(e) => onRoleFilterChange(e.target.value)}
-            className="w-95 rounded-md border-2 px-3 py-2 border-orange-500 outline-0 dark:bg-slate-800"
-          >
-            <option value="">All roles</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+                <button
+                  type="button"
+                  onClick={() => onTabChange('trash')}
+                  className={cx(
+                    'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                    activeTab === 'trash'
+                      ? 'bg-red-500 text-white shadow'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  <Archive size={16} />
+                  Trash
+                  <span className={cx(
+                    'rounded-full px-2 py-0.5 text-xs',
+                    activeTab === 'trash' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                  )}>
+                    {stats.trash_count}
+                  </span>
+                </button>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {auth.permissions.includes('admin.user.store') && (
-              <button
-                onClick={openCreate}
-                className="skBtnShadow cursor-pointer rounded-md px-4 py-2 font-bold text-orange-500"
-              >
-                + Add User
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {auth.permissions.includes('admin.user.store') && activeTab === 'users' && (
+                <Button
+                  onClick={openCreate}
+                  className='text-orange-500 font-bold'
+                >
+                  + Add User
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-hidden rounded-xl skShadow">
-          <div className="border-b px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">
-            Users List
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard title="Total Users" value={stats.users_count} />
+          <StatCard title="Active Users" value={stats.active_count} tone="green" />
+          <StatCard title="Inactive Users" value={stats.inactive_count} tone="amber" />
+          <StatCard title="Trash" value={stats.trash_count} tone="red" />
+        </div>
+
+        <div className=" p-4 skShadow rounded-2xl">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {activeTab === 'users' ? 'Users List' : 'Trash List'}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{statusSummary}</p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:flex-wrap xl:items-center">
+              <input
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder={activeTab === 'trash' ? 'Search trashed users...' : 'Search by name, phone or email...'}
+                className="min-w-[240px] px-4 py-2.5 text-sm outline-none transition border border-gray-500 rounded-md dark:bg-gray-800"
+              />
+
+              <select
+                value={roleFilter}
+                onChange={(e) => onRoleFilterChange(e.target.value)}
+                className="min-w-[180px]  px-4 py-2.5 text-sm outline-none transition border border-gray-500 rounded-md dark:bg-gray-800"
+              >
+                <option value="">All roles</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.name}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+
+              {activeTab === 'users' && (
+                <select
+                  value={statusFilter}
+                  onChange={(e) => onStatusFilterChange(e.target.value as StatusFilter)}
+                  className="min-w-[180px] px-4 py-2.5 text-sm outline-none transition border border-gray-500 rounded-md dark:bg-gray-800"
+                >
+                  <option value="">All status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              )}
+            </div>
           </div>
 
-          <div className="overflow-x-auto p-4">
-            {users.data.length === 0 ? (
-              <div className="text-slate-600 dark:text-slate-300">No users found.</div>
-            ) : (
-              <>
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        Name
-                      </th>
-                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        Phone
-                      </th>
-                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        Email
-                      </th>
-                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        Role
-                      </th>
-                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                        Created
-                      </th>
-
+          <div className="mt-5 overflow-hidden rounded-2xl">
+            <div className="overflow-x-auto">
+              {users.data.length === 0 ? (
+                <div className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {activeTab === 'trash' ? 'No trashed users found.' : 'No users found.'}
+                </div>
+              ) : (
+                <table className="w-full min-w-[860px] border-collapse">
+                  <thead className="bg-slate-50 dark:bg-neutral-900/80">
+                    <tr className="text-left">
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Name</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</th>
                       {canShowActions && (
-                        <th className="px-3 py-2 text-right text-sm font-semibold text-slate-600 dark:text-slate-300">
-                          Actions
-                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</th>
                       )}
                     </tr>
                   </thead>
 
                   <tbody>
-                    {users.data.map((u) => (
-                      <tr
-                        key={u.id}
-                        className="border-b last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        <td className="px-3 py-3 font-medium text-slate-800 dark:text-slate-100">
-                          {u.name}
-                        </td>
+                    {users.data.map((user) => {
+                      const statusBadge = activeTab === 'trash'
+                        ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600 dark:bg-red-950/40 dark:text-red-300">Trashed</span>
+                        : user.is_active
+                          ? <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-300">Active</span>
+                          : <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Inactive</span>;
 
-                        <td className="px-3 py-3 text-slate-600 dark:text-slate-300">
-                          {u.phone ?? '—'}
-                        </td>
-
-                        <td className="px-3 py-3 text-slate-600 dark:text-slate-300">
-                          {u.email ?? '—'}
-                        </td>
-
-                        <td className="px-3 py-3 text-orange-500">{u.role ?? '—'}</td>
-
-                        <td className="px-3 py-3 text-slate-600 dark:text-slate-300">
-                          {new Date(u.created_at).toLocaleDateString()}
-                        </td>
-
-                        {canShowActions && (
-                          <td className="space-x-3 px-3 py-3 text-right">
-                            {auth.permissions.includes('admin.user.update') && (
-                              <button
-                                onClick={() => openEdit(u)}
-                                className="cursor-pointer text-sm font-semibold text-orange-500 hover:text-orange-600"
-                              >
-                                <SquarePen />
-                              </button>
-                            )}
-
-                            {auth.permissions.includes('admin.user.destroy') && (
-                              <button
-                                onClick={() => confirmDelete(u)}
-                                className="cursor-pointer text-sm font-semibold text-red-500 hover:text-red-600"
-                              >
-                                <Trash />
-                              </button>
-                            )}
+                      return (
+                        <tr key={user.id} className="border-t border-slate-200 bg-white transition hover:bg-slate-50 dark:border-slate-800 dark:bg-neutral-800 dark:hover:bg-neutral-800/70">
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-slate-900 dark:text-slate-100">{user.name}</div>
                           </td>
-                        )}
-                      </tr>
-                    ))}
+                          <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">{user.phone}</td>
+                          <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">{user.email ?? '—'}</td>
+                          <td className="px-4 py-4 text-sm font-medium text-orange-500">{user.role ?? '—'}</td>
+                          <td className="px-4 py-4">{statusBadge}</td>
+                          <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                            {new Date(user.created_at).toLocaleDateString()}
+                          </td>
+                          {canShowActions && (
+                            <td className="px-4 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                {activeTab === 'users' && auth.permissions.includes('admin.user.update') && (
+                                  <button
+                                    onClick={() => openEdit(user)}
+                                    className="inline-flex items-center rounded-xl border border-slate-200 p-2 text-orange-500 transition hover:bg-orange-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                                    title="Edit user"
+                                  >
+                                    <SquarePen size={18} />
+                                  </button>
+                                )}
+
+                                {activeTab === 'users' && auth.permissions.includes('admin.user.destroy') && (
+                                  <button
+                                    onClick={() => confirmTrash(user)}
+                                    className="inline-flex items-center rounded-xl border border-slate-200 p-2 text-red-500 transition hover:bg-red-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                                    title="Move to trash"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+
+                                {activeTab === 'trash' && auth.permissions.includes('admin.user.restore') && (
+                                  <button
+                                    onClick={() => confirmRestore(user)}
+                                    className="inline-flex items-center rounded-xl border border-slate-200 p-2 text-green-600 transition hover:bg-green-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                                    title="Restore user"
+                                  >
+                                    <RotateCcw size={18} />
+                                  </button>
+                                )}
+
+                                {activeTab === 'trash' && auth.permissions.includes('admin.user.forcedelete') && (
+                                  <button
+                                    onClick={() => confirmForceDelete(user)}
+                                    className="inline-flex items-center rounded-xl border border-slate-200 p-2 text-red-700 transition hover:bg-red-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                                    title="Delete permanently"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-
-                <Pagination links={users.links} q={search} role={roleFilter} />
-              </>
-            )}
+              )}
+            </div>
           </div>
+
+          <Pagination links={users.links} />
         </div>
       </div>
 
-      {/* ---------------- CREATE MODAL ---------------- */}
-      <Modal isOpen={createOpen} onClose={closeCreate} title="Create User" width="w-full max-w-xl">
+      <Modal isOpen={createOpen} onClose={closeCreate} title="Create User" width="w-full max-w-2xl">
         <form onSubmit={submitCreate} className="space-y-4" autoComplete="off">
-          <div>
-            <label className="text-sm font-semibold">Name</label>
-            <input
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={createForm.data.name}
-              onChange={(e) => createForm.setData('name', e.target.value)}
-            />
-            {createForm.errors.name && (
-              <div className="mt-1 text-sm text-red-600">{createForm.errors.name}</div>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold">Phone</label>
-            <input
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+8801XXXXXXXXX"
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={createForm.data.phone}
-              onChange={(e) => createForm.setData('phone', normalizeBDPhone(e.target.value))}
-            />
-            {createForm.errors.phone && (
-              <div className="mt-1 text-sm text-red-600">{createForm.errors.phone}</div>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold">Email</label>
-            <input
-              type="email"
-              autoComplete="off"
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={createForm.data.email}
-              onChange={(e) => createForm.setData('email', e.target.value)}
-            />
-            {createForm.errors.email && (
-              <div className="mt-1 text-sm text-red-600">{createForm.errors.email}</div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-semibold">Password</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Name</label>
               <input
-                type="password"
-                autoComplete="off"
-                className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-                value={createForm.data.password}
-                onChange={(e) => createForm.setData('password', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={createForm.data.name}
+                onChange={(e) => createForm.setData('name', e.target.value)}
               />
-              {createForm.errors.password && (
-                <div className="mt-1 text-sm text-red-600">{createForm.errors.password}</div>
-              )}
+              {createForm.errors.name && <div className="mt-1 text-sm text-red-600">{createForm.errors.name}</div>}
             </div>
 
             <div>
-              <label className="text-sm font-semibold">Confirm Password</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Phone</label>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+8801XXXXXXXXX"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={createForm.data.phone}
+                onChange={(e) => createForm.setData('phone', normalizeBDPhone(e.target.value))}
+              />
+              {createForm.errors.phone && <div className="mt-1 text-sm text-red-600">{createForm.errors.phone}</div>}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Email</label>
+              <input
+                type="email"
+                autoComplete="off"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={createForm.data.email}
+                onChange={(e) => createForm.setData('email', e.target.value)}
+              />
+              {createForm.errors.email && <div className="mt-1 text-sm text-red-600">{createForm.errors.email}</div>}
+            </div>
+
+            <StatusSelect
+              value={createForm.data.is_active}
+              onChange={(val) => createForm.setData('is_active', val)}
+              error={createForm.errors.is_active}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Password</label>
               <input
                 type="password"
                 autoComplete="new-password"
-                className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={createForm.data.password}
+                onChange={(e) => createForm.setData('password', e.target.value)}
+              />
+              {createForm.errors.password && <div className="mt-1 text-sm text-red-600">{createForm.errors.password}</div>}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Confirm Password</label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
                 value={createForm.data.password_confirmation}
                 onChange={(e) => createForm.setData('password_confirmation', e.target.value)}
               />
@@ -587,95 +748,95 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
           <RoleSelect
             roles={roles}
             value={createForm.data.role}
-            onChange={(v) => createForm.setData('role', v)}
+            onChange={(value) => createForm.setData('role', value)}
             error={createForm.errors.role}
-            label="Role"
           />
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={closeCreate} className="rounded border px-4 py-2 text-sm">
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={closeCreate} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
               Cancel
             </button>
-
             <button
               disabled={createForm.processing}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-60"
             >
-              {createForm.processing ? 'Saving...' : 'Create'}
+              {createForm.processing ? 'Saving...' : 'Create User'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* ---------------- EDIT MODAL ---------------- */}
       <Modal
         isOpen={editOpen}
         onClose={closeEdit}
         title={`Edit User${selectedUser ? `: ${selectedUser.name}` : ''}`}
-        width="w-full max-w-xl"
+        width="w-full max-w-2xl"
       >
-        <form onSubmit={submitEdit} className="space-y-4">
-          <div>
-            <label className="text-sm font-semibold">Name</label>
-            <input
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={editForm.data.name}
-              onChange={(e) => editForm.setData('name', e.target.value)}
-            />
-            {editForm.errors.name && (
-              <div className="mt-1 text-sm text-red-600">{editForm.errors.name}</div>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold">Phone</label>
-            <input
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={editForm.data.phone}
-              onChange={(e) => editForm.setData('phone', normalizeBDPhone(e.target.value))}
-            />
-            {editForm.errors.phone && (
-              <div className="mt-1 text-sm text-red-600">{editForm.errors.phone}</div>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold">Email</label>
-            <input
-              type="email"
-              autoComplete="off"
-              className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-              value={editForm.data.email}
-              onChange={(e) => editForm.setData('email', e.target.value)}
-            />
-            {editForm.errors.email && (
-              <div className="mt-1 text-sm text-red-600">{editForm.errors.email}</div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={submitEdit} className="space-y-4" autoComplete="off">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-semibold">New Password (optional)</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Name</label>
               <input
-                type="password"
-                autoComplete="new-password"
-                className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
-                value={editForm.data.password}
-                onChange={(e) => editForm.setData('password', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={editForm.data.name}
+                onChange={(e) => editForm.setData('name', e.target.value)}
               />
-              {editForm.errors.password && (
-                <div className="mt-1 text-sm text-red-600">{editForm.errors.password}</div>
-              )}
+              {editForm.errors.name && <div className="mt-1 text-sm text-red-600">{editForm.errors.name}</div>}
             </div>
 
             <div>
-              <label className="text-sm font-semibold">Confirm Password (optional)</label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Phone</label>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={editForm.data.phone}
+                onChange={(e) => editForm.setData('phone', normalizeBDPhone(e.target.value))}
+              />
+              {editForm.errors.phone && <div className="mt-1 text-sm text-red-600">{editForm.errors.phone}</div>}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Email</label>
+              <input
+                type="email"
+                autoComplete="off"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={editForm.data.email}
+                onChange={(e) => editForm.setData('email', e.target.value)}
+              />
+              {editForm.errors.email && <div className="mt-1 text-sm text-red-600">{editForm.errors.email}</div>}
+            </div>
+
+            <StatusSelect
+              value={editForm.data.is_active}
+              onChange={(val) => editForm.setData('is_active', val)}
+              error={editForm.errors.is_active}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">New Password (optional)</label>
               <input
                 type="password"
-                className="mt-1 w-full rounded border px-3 py-2 dark:bg-slate-800"
+                autoComplete="new-password"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
+                value={editForm.data.password}
+                onChange={(e) => editForm.setData('password', e.target.value)}
+              />
+              {editForm.errors.password && <div className="mt-1 text-sm text-red-600">{editForm.errors.password}</div>}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">Confirm Password</label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900"
                 value={editForm.data.password_confirmation}
                 onChange={(e) => editForm.setData('password_confirmation', e.target.value)}
               />
@@ -685,21 +846,19 @@ export default function AdminUsersPage({ users, roles, auth, filters }: Props) {
           <RoleSelect
             roles={roles}
             value={editForm.data.role}
-            onChange={(v) => editForm.setData('role', v)}
+            onChange={(value) => editForm.setData('role', value)}
             error={editForm.errors.role}
-            label="Role"
           />
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={closeEdit} className="rounded border px-4 py-2 text-sm">
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={closeEdit} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
               Cancel
             </button>
-
             <button
               disabled={editForm.processing}
-              className="rounded bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+              className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
             >
-              {editForm.processing ? 'Updating...' : 'Update'}
+              {editForm.processing ? 'Updating...' : 'Update User'}
             </button>
           </div>
         </form>

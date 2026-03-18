@@ -18,10 +18,17 @@ return new class extends Migration
             $table->string('profile_photo')->nullable();
 
             $table->timestamp('email_verified_at')->nullable();
+            $table->timestamp('phone_verified_at')->nullable();
             $table->string('password');
 
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('email');
+            $table->index('phone');
+            $table->index('name');
+            $table->index('is_active');
         });
 
         // ✅ Phone-first reset support (if you build it later)

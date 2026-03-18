@@ -21,6 +21,8 @@ class RolesAndPermissionsSeeder extends Seeder
                 'admin.user.store',
                 'admin.user.update',
                 'admin.user.destroy',
+                'admin.user.restore',
+                'admin.user.forcedelete',
             ],
 
             // Role Management
